@@ -26,6 +26,11 @@ mkdir -p ~/develop
 
 curl -LfsS https://raw.githubusercontent.com/yuuki0508/laravel-inertia-template/main/setup.sh | bash -s my-project
 
+もし改行コードエラーが出た場合は
+
+curl -LfsS -H "Cache-Control: no-cache" https://raw.githubusercontent.com/yuuki0508/laravel-inertia-template/main/setup.sh | bash -s my-project
+
+を実行する
 
 
 ## 削除手順
