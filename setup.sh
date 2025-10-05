@@ -1,127 +1,87 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-# ===== 初期設定 =====
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# ======================================================
+# 🚀 Laravel Sail + Vue + Inertia 環境 自動構築スクリプト
+# ======================================================
 
-echo -e "${BLUE}================================${NC}"
-echo -e "${BLUE} Laravel Sail + Inertia + Vue 自動構築 ${NC}"
-echo -e "${BLUE}================================${NC}"
+echo "============================================="
+echo " 🚀 Laravel Sail + Docker + Inertia + Vue セットアップ"
+echo "============================================="
 echo ""
 
-# ===== プロジェクト名の取得 =====
-if [ -z "$1" ]; then
-    read -p "プロジェクト名を入力してください: " PROJECT_NAME
+# --- 引数チェック ---
+if [ $# -lt 1 ]; then
+  read -rp "プロジェクト名を入力してください（例: my-app）: " PROJECT_NAME
 else
-    PROJECT_NAME=$1
-fi
-if [ -z "$PROJECT_NAME" ]; then
-    echo -e "${YELLOW}⚠️ プロジェクト名が指定されていません。中止します。${NC}"
-    exit 1
+  PROJECT_NAME=$1
 fi
 
-# ===== developディレクトリの確認 =====
-DEV_DIR="$HOME/develop"
-mkdir -p "$DEV_DIR"
-cd "$DEV_DIR"
+# --- 環境確認 ---
+if ! command -v docker >/dev/null 2>&1; then
+  echo "❌ Dockerがインストールされていません。Docker Desktopを導入してください。"
+  exit 1
+fi
 
-# ===== プロジェクトディレクトリ作成 =====
-if [ -d "$PROJECT_NAME" ]; then
-    echo -e "${YELLOW}⚠️ 既に $PROJECT_NAME ディレクトリが存在します。再利用します。${NC}"
+if ! command -v wsl >/dev/null 2>&1; then
+  echo "❌ WSL2環境が検出されません。Windowsの機能でWSL2を有効化してください。"
+  exit 1
+fi
+
+# --- ディレクトリ設定 ---
+WORK_DIR="$HOME/develop/$PROJECT_NAME"
+
+echo "📁 プロジェクトディレクトリを作成します: $WORK_DIR"
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
+
+# --- Laravel プロジェクト作成 ---
+if [ ! -d "$WORK_DIR/vendor" ]; then
+  echo "🧱 Laravelプロジェクトを作成しています..."
+  docker run --rm \
+    -v "$(pwd)":/opt \
+    -w /opt \
+    laravelsail/php83-composer:latest \
+    composer create-project laravel/laravel .
 else
-    mkdir "$PROJECT_NAME"
-    echo -e "${GREEN}✅ $PROJECT_NAME ディレクトリを作成しました${NC}"
-fi
-cd "$PROJECT_NAME"
-
-# ===== 必要ツール確認 =====
-echo -e "${BLUE}[1/8] ツール確認中...${NC}"
-for cmd in docker docker-compose curl git; do
-    if ! command -v $cmd &> /dev/null; then
-        echo -e "${YELLOW}$cmd が見つかりません。インストールしてください。${NC}"
-        exit 1
-    fi
-done
-echo -e "${GREEN}✅ 必要ツール確認完了${NC}"
-
-# ===== Laravel プロジェクト作成 =====
-if [ ! -f "artisan" ]; then
-    echo -e "${BLUE}[2/8] Laravel プロジェクト作成中...${NC}"
-    sudo -u $USER docker run --rm \
-      -v $(pwd):/app \
-      -w /app \
-      laravelsail/php84-composer:latest \
-      bash -c "composer create-project laravel/laravel ."
-else
-    echo -e "${YELLOW}⚠️ Laravel は既に作成済みです。${NC}"
+  echo "✅ Laravelは既にインストール済みのようです。"
 fi
 
-# ===== Sail 設定 =====
-if [ ! -f "docker-compose.yml" ]; then
-    echo -e "${BLUE}[3/8] Laravel Sail セットアップ中...${NC}"
-    docker run --rm \
-      -v $(pwd):/app \
-      -w /app \
-      laravelsail/php84-composer:latest bash -c "composer require laravel/sail --dev && php artisan sail:install --with=mysql,redis,mailpit"
-fi
+# --- Sailインストール ---
+echo "⚙️ Sailをインストール中..."
+docker run --rm \
+  -v "$(pwd)":/opt \
+  -w /opt \
+  laravelsail/php83-composer:latest \
+  composer require laravel/sail --dev
 
-# ===== .env設定 =====
-echo -e "${BLUE}[4/8] 環境設定中...${NC}"
-cp -n .env.example .env || true
-sed -i "s/APP_NAME=.*/APP_NAME=\"$PROJECT_NAME\"/" .env
-sed -i "s/DB_HOST=.*/DB_HOST=mysql/" .env
-sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=password/" .env
-sed -i "s/DB_USERNAME=.*/DB_USERNAME=sail/" .env
-sed -i "s/DB_DATABASE=.*/DB_DATABASE=laravel/" .env
+# --- Sailセットアップ ---
+echo "🛠 Sailを初期化中..."
+php artisan sail:install --with=mysql,redis,meilisearch,mailpit,selenium
 
-# ===== コンテナ起動 =====
-echo -e "${BLUE}[5/8] Docker コンテナを起動中...${NC}"
-export SAIL_USER=$(id -u):$(id -g)
-sudo chown -R $USER:$USER .
+# --- .env修正 ---
+sed -i 's/DB_HOST=127.0.0.1/DB_HOST=mysql/' .env
+sed -i 's/DB_PASSWORD=/DB_PASSWORD=password/' .env
 
+# --- Sailビルド＆起動 ---
+echo "🐳 Dockerコンテナを起動します (初回は数分かかります)..."
 ./vendor/bin/sail up -d --build
 
-# ===== Breeze + Inertia + Vue =====
-if [ ! -d "resources/js/Pages" ]; then
-    echo -e "${BLUE}[6/8] Laravel Breeze + Inertia + Vue セットアップ中...${NC}"
-    ./vendor/bin/sail composer require laravel/breeze --dev
-    ./vendor/bin/sail artisan breeze:install vue --no-interaction
-    ./vendor/bin/sail npm install
-fi
+# --- Node.js & npmセットアップ ---
+echo "🧩 Node.js + Vue + Inertiaを導入中..."
+./vendor/bin/sail npm install vue @vitejs/plugin-vue laravel-vite-plugin inertia inertia-vue3
+./vendor/bin/sail npm install
 
-# ===== Ziggy設定 =====
-echo -e "${BLUE}[7/8] Ziggy 設定中...${NC}"
-./vendor/bin/sail composer require tightenco/ziggy
-./vendor/bin/sail artisan vendor:publish --tag=ziggy-config --force || true
+# --- 開発ビルド実行 ---
+./vendor/bin/sail npm run build
 
-# ===== 初期マイグレーション =====
-echo -e "${BLUE}[8/8] データベース初期化中...${NC}"
-sleep 5
-./vendor/bin/sail artisan migrate --force
-
-# ===== 完了 =====
-cat > start.sh <<'EOF'
-#!/bin/bash
-./vendor/bin/sail up -d
-./vendor/bin/sail npm run dev
-EOF
-chmod +x start.sh
-
-# --- 権限の最終調整 ---
-sudo chown -R $USER:$USER .
-
+# --- URL確認 ---
+APP_PORT=80
 echo ""
-echo -e "${GREEN}================================${NC}"
-echo -e "${GREEN}🎉 セットアップ完了！${NC}"
-echo -e "${GREEN}================================${NC}"
-echo ""
-echo "📁 パス: ~/develop/$PROJECT_NAME"
-echo "🌐 アプリ: http://localhost"
-echo "📬 Mailpit: http://localhost:8025"
-echo ""
-echo "次回起動コマンド:"
-echo "  cd ~/develop/$PROJECT_NAME && ./start.sh"
-echo ""
+echo "============================================="
+echo "✅ セットアップが完了しました！"
+echo "---------------------------------------------"
+echo "📂 プロジェクトディレクトリ: $WORK_DIR"
+echo "🌐 アプリURL: http://localhost:$APP_PORT"
+echo "🐘 PHPMyAdmin: http://localhost:8080 (root / password)"
+echo "============================================="
