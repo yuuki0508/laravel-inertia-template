@@ -94,10 +94,24 @@ sleep 10
 echo "🎨 Breezeをインストール中..."
 ./vendor/bin/sail artisan breeze:install vue --no-interaction
 
-# ✅ Node 依存パッケージをインストール
+# ✅ package.jsonのViteバージョンを修正
+echo "🔧 Vite依存関係を修正中..."
+./vendor/bin/sail exec laravel.test bash -c "cat > /tmp/fix_package.json << 'EOFSCRIPT'
+const fs = require('fs');
+const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+packageJson.devDependencies['vite'] = '^6.0.0';
+packageJson.devDependencies['@vitejs/plugin-vue'] = '^5.2.0';
+fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 4));
+EOFSCRIPT
+node /tmp/fix_package.json"
+
+# ✅ Node 依存パッケージをクリーンインストール
 echo "📦 Node.jsパッケージをインストール中..."
-./vendor/bin/sail npm install
-./vendor/bin/sail npm install @inertiajs/progress ziggy-js --save
+./vendor/bin/sail npm install --legacy-peer-deps
+
+# ✅ 追加パッケージをインストール
+echo "📦 追加パッケージをインストール中..."
+./vendor/bin/sail npm install @inertiajs/progress ziggy-js --save --legacy-peer-deps
 
 # ✅ Ziggy導入
 echo "🗺️ Ziggyをインストール中..."
@@ -108,6 +122,10 @@ echo "🗺️ Ziggyをインストール中..."
 echo "🧱 データベースを初期化中..."
 ./vendor/bin/sail artisan key:generate
 ./vendor/bin/sail artisan migrate --seed
+
+# ---------- ビルド ----------
+echo "🏗️ フロントエンドをビルド中..."
+./vendor/bin/sail npm run build
 
 # ---------- 完了メッセージ ----------
 echo ""
