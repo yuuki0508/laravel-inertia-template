@@ -1,82 +1,96 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -e
 
-# ======================================================
-# 🚀 Laravel Sail + Vue + Inertia 環境 自動構築スクリプト
-# ======================================================
+# ================================
+#  Laravel + Inertia + Vue 環境構築スクリプト (Docker完全依存)
+#  動作環境: Ubuntu (WSL2) + Docker Desktop
+# ================================
 
-echo "============================================="
-echo " 🚀 Laravel Sail + Docker + Inertia + Vue セットアップ"
-echo "============================================="
-echo ""
+# --- UTF-8設定 ---
+export LANG=C.UTF-8
 
-# --- 引数チェック ---
-if [ $# -lt 1 ]; then
-  read -rp "プロジェクト名を入力してください（例: my-app）: " PROJECT_NAME
-else
-  PROJECT_NAME=$1
-fi
-
-# --- 環境確認 ---
-if ! command -v docker >/dev/null 2>&1; then
-  echo "❌ Dockerがインストールされていません。Docker Desktopを導入してください。"
+# --- プロジェクト名の取得 ---
+PROJECT_NAME=$1
+if [ -z "$PROJECT_NAME" ]; then
+  echo "🧩 プロジェクト名を指定してください。例："
+  echo "  bash <(curl -fsSL https://raw.githubusercontent.com/yuuki0508/laravel-inertia-template/main/setup.sh) my-project"
   exit 1
 fi
 
-# --- ディレクトリ設定 ---
-WORK_DIR="$HOME/develop/$PROJECT_NAME"
+DEV_DIR="$HOME/develop"
+PROJECT_DIR="$DEV_DIR/$PROJECT_NAME"
 
-echo "📁 プロジェクトディレクトリを作成します: $WORK_DIR"
-mkdir -p "$WORK_DIR"
-cd "$WORK_DIR"
+echo "=============================================="
+echo "🚀 Laravel + Inertia + Vue 環境を構築します"
+echo "=============================================="
+echo ""
+echo "📂 プロジェクト名: $PROJECT_NAME"
+echo "📁 作成先: $PROJECT_DIR"
+echo ""
 
-# --- Laravel プロジェクト作成 ---
-if [ ! -d "$WORK_DIR/vendor" ]; then
-  echo "🧱 Laravelプロジェクトを作成しています..."
-  docker run --rm \
-    -v "$(pwd)":/opt \
-    -w /opt \
-    laravelsail/php83-composer:latest \
-    composer create-project laravel/laravel .
-else
-  echo "✅ Laravelは既にインストール済みのようです。"
+# --- developディレクトリ確認 ---
+if [ ! -d "$DEV_DIR" ]; then
+  echo "📁 developディレクトリが存在しません。作成します..."
+  mkdir -p "$DEV_DIR"
 fi
 
-# --- Sailインストール ---
-echo "⚙️ Sailをインストール中..."
-docker run --rm \
-  -v "$(pwd)":/opt \
-  -w /opt \
-  laravelsail/php83-composer:latest \
-  composer require laravel/sail --dev
+# --- プロジェクトフォルダ確認 ---
+if [ -d "$PROJECT_DIR" ]; then
+  echo "⚠️ 既に同名のプロジェクトが存在します。削除して再作成しますか？ (y/n)"
+  read -r CONFIRM
+  if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
+    rm -rf "$PROJECT_DIR"
+  else
+    echo "🚫 中止しました。"
+    exit 0
+  fi
+fi
+
+mkdir -p "$PROJECT_DIR"
+cd "$PROJECT_DIR"
+
+# --- Laravelプロジェクト作成（Docker Composer使用） ---
+echo ""
+echo "🧱 Laravel プロジェクトを作成中..."
+docker run --rm -v "$(pwd):/app" composer create-project laravel/laravel .
+
+# --- Sail準備 ---
+echo ""
+echo "⚙️ Laravel Sail をインストール中..."
+docker run --rm -v "$(pwd):/app" -w /app laravelsail/php84-composer:latest composer require laravel/sail --dev
 
 # --- Sailセットアップ ---
-echo "🛠 Sailを初期化中..."
-php artisan sail:install --with=mysql,redis,meilisearch,mailpit,selenium
+echo ""
+echo "⚙️ Sail 初期化中..."
+./vendor/bin/sail install --with=mysql,redis,meilisearch,mailpit,selenium
 
-# --- .env修正 ---
-sed -i 's/DB_HOST=127.0.0.1/DB_HOST=mysql/' .env
-sed -i 's/DB_PASSWORD=/DB_PASSWORD=password/' .env
-
-# --- Sailビルド＆起動 ---
-echo "🐳 Dockerコンテナを起動します (初回は数分かかります)..."
-./vendor/bin/sail up -d --build
-
-# --- Node.js & npmセットアップ ---
-echo "🧩 Node.js + Vue + Inertiaを導入中..."
-./vendor/bin/sail npm install vue @vitejs/plugin-vue laravel-vite-plugin inertia inertia-vue3
-./vendor/bin/sail npm install --legacy-peer-deps
-
-# --- 開発ビルド実行 ---
+# --- npm / Node環境構築 ---
+echo ""
+echo "📦 フロントエンド依存関係をインストール中..."
+./vendor/bin/sail npm install
+./vendor/bin/sail npm install vue @vitejs/plugin-vue laravel-vite-plugin
 ./vendor/bin/sail npm run build
 
-# --- URL確認 ---
-APP_PORT=80
+# --- Inertia導入 ---
 echo ""
-echo "============================================="
+echo "🔗 Inertia.js を導入中..."
+./vendor/bin/sail composer require inertiajs/inertia-laravel
+./vendor/bin/sail npm install @inertiajs/vue3
+./vendor/bin/sail artisan inertia:middleware
+./vendor/bin/sail artisan migrate
+
+# --- アプリ起動 ---
+echo ""
+echo "🚀 Dockerコンテナを起動します..."
+./vendor/bin/sail up -d
+
+# --- 完了メッセージ ---
+echo ""
 echo "✅ セットアップが完了しました！"
 echo "---------------------------------------------"
-echo "📂 プロジェクトディレクトリ: $WORK_DIR"
-echo "🌐 アプリURL: http://localhost:$APP_PORT"
-echo "🐘 PHPMyAdmin: http://localhost:8080 (root / password)"
-echo "============================================="
+echo " プロジェクト: $PROJECT_NAME"
+echo " URL: http://localhost"
+echo " コンテナ起動: ./vendor/bin/sail up -d"
+echo " 停止: ./vendor/bin/sail down"
+echo " 再構築: ./vendor/bin/sail build --no-cache"
+echo "---------------------------------------------"
