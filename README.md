@@ -4,4 +4,5 @@ Windows + Docker Desktop + WSL2 がセットアップ済みの状態で、
 以下のコマンドを PowerShell（管理者権限）で実行してください。
 
 ```powershell
+cd $home
 iwr -useb https://raw.githubusercontent.com/yuuki0508/laravel-inertia-template/main/setup-laravel.ps1 | iex

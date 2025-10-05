@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Laravel Sail + Vue + Inertia 環境 自動構築スクリプト
 .DESCRIPTION
