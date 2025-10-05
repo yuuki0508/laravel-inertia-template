@@ -74,15 +74,15 @@ sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=${DB_PASSWORD}/" .env
 sed -i "s/APP_PORT=.*/APP_PORT=${APP_PORT}/" .env
 sed -i "s/APP_NAME=.*/APP_NAME=\"${PROJECT_NAME}\"/" .env
 
-# ---------- コンテナ起動 ----------
-echo "🐳 Dockerコンテナを起動中..."
-./vendor/bin/sail up -d
-
 # ---------- Breeze + Vue + Inertia ----------
 echo "✨ Laravel Breeze + Vue + Inertia を導入中..."
 ./vendor/bin/sail composer require laravel/breeze --dev
 ./vendor/bin/sail artisan breeze:install vue --inertia
 
+# ✅ コンテナを一度起動（依存解決に必要）
+./vendor/bin/sail up -d
+
+# ✅ Node 依存パッケージをインストール
 ./vendor/bin/sail npm install
 ./vendor/bin/sail npm install @inertiajs/progress ziggy-js --save
 ./vendor/bin/sail composer require tightenco/ziggy
