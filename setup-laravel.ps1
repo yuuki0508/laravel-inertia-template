@@ -1,130 +1,112 @@
-# =============================================
-# 🚀 Laravel Sail + Docker + WSL2 完全自動構築スクリプト（冪等対応版）
-# ---------------------------------------------
-# ✅ 前提条件:
-#   - Windows + Docker Desktop + WSL2 が導入済み
-#   - このファイルは PowerShell (管理者権限) で実行
-#   - GitHub リポジトリ: yuuki0508/laravel-inertia-template
-# =============================================
-
-# --- UTF-8出力対策 ---
+# --- UTF-8文字化け対策 ---
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'
+# -------------------------
 
-# --- 基本設定 ---
-$repoUser = "yuuki0508"
-$repoName = "laravel-inertia-template"
-$ubuntuDistro = "Ubuntu"
-$ubuntuRoot = "C:\WSL\$ubuntuDistro"
-$ubuntuUrl = "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-ubuntu22.04lts.rootfs.tar.gz"
-$setupUrl = "https://raw.githubusercontent.com/$repoUser/$repoName/main/setup.sh"
-$setupFile = "$env:USERPROFILE\setup.sh"
-
-Write-Host ""
 Write-Host "=============================================" -ForegroundColor Cyan
-Write-Host " 🚀 Laravel Sail + Docker + WSL2 自動構築 開始 " -ForegroundColor Cyan
+Write-Host " 🚀 Laravel Sail + Docker + WSL2 自動構築スクリプト" -ForegroundColor Cyan
 Write-Host "=============================================" -ForegroundColor Cyan
 Write-Host ""
 
-# --- Dockerチェック ---
+# ===== 事前チェック =====
 if (-not (Get-Command "docker" -ErrorAction SilentlyContinue)) {
     Write-Host "❌ Docker Desktop が見つかりません。インストールしてください。" -ForegroundColor Red
     exit 1
 }
 
-# --- WSL有効化チェック ---
-$wslStatus = wsl --status 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ WSL2 が有効化されていません。再起動後に有効化してください。" -ForegroundColor Red
-    exit 1
-}
+# ===== Ubuntu チェック =====
+$ubuntuDistro = "Ubuntu"
+$existingUbuntu = wsl -l -q | Where-Object { $_ -match $ubuntuDistro }
 
-# --- Ubuntu の存在確認 ---
-$existing = wsl -l -q | Select-String $ubuntuDistro
-if (-not $existing) {
-    Write-Host "⬇️ Ubuntuが見つかりません。手動でrootfsからインストールします..." -ForegroundColor Yellow
-
-    # ディレクトリ作成
-    if (-not (Test-Path $ubuntuRoot)) {
-        New-Item -ItemType Directory -Path $ubuntuRoot | Out-Null
+if (-not $existingUbuntu) {
+    Write-Host "⬇️ Ubuntu を自動インストールします..." -ForegroundColor Yellow
+    $ubuntuDir = "C:\WSL\$ubuntuDistro"
+    if (-not (Test-Path $ubuntuDir)) {
+        New-Item -ItemType Directory -Path $ubuntuDir | Out-Null
     }
 
+    # Ubuntu 22.04 LTS (WSL用 rootfs)
+    $ubuntuUrl = "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-ubuntu22.04lts.rootfs.tar.gz"
     $ubuntuTar = "$env:TEMP\ubuntu.tar.gz"
 
-    # rootfs ダウンロード
-    Write-Host "🌐 Ubuntu rootfs をダウンロード中..." -ForegroundColor Cyan
+    Write-Host "🌐 Ubuntu rootfs をダウンロード中..." -ForegroundColor Yellow
     Invoke-WebRequest -Uri $ubuntuUrl -OutFile $ubuntuTar -UseBasicParsing
 
-    # WSL インポート
-    Write-Host "📦 Ubuntu rootfs をインポート中..." -ForegroundColor Cyan
-    wsl --import $ubuntuDistro $ubuntuRoot $ubuntuTar --version 2
+    Write-Host "📦 Ubuntu を登録中..." -ForegroundColor Yellow
+    wsl --import $ubuntuDistro $ubuntuDir $ubuntuTar --version 2
 
+    Write-Host "✅ Ubuntu インストール完了！" -ForegroundColor Green
     Remove-Item $ubuntuTar -Force
-    Write-Host "✅ Ubuntu のインポートが完了しました。" -ForegroundColor Green
 } else {
-    Write-Host "🟢 Ubuntu は既にインストールされています。スキップします。" -ForegroundColor Green
+    Write-Host "🟢 Ubuntu はすでにインストールされています。" -ForegroundColor Green
 }
 
-# --- setup.sh のダウンロード（安全・再実行対応） ---
-Write-Host ""
-Write-Host "📥 setup.sh をダウンロード中..." -ForegroundColor Cyan
-
-# 古いファイル削除
-Get-ChildItem -Path $env:USERPROFILE -Filter "setup.sh*" | Remove-Item -Force -ErrorAction SilentlyContinue
-
-# 新規ダウンロード
-Invoke-WebRequest -Uri $setupUrl -OutFile $setupFile -UseBasicParsing
-
-# 不可視文字を除去
-$newName = "$env:USERPROFILE\setup.sh"
-Get-ChildItem $env:USERPROFILE | Where-Object { $_.Name -match "setup.sh" -and $_.Name -ne "setup.sh" } | ForEach-Object {
-    Rename-Item $_.FullName $newName -Force
-}
-
-if (Test-Path $setupFile) {
-    Write-Host "✅ setup.sh ダウンロード完了: $setupFile" -ForegroundColor Green
-} else {
-    Write-Host "❌ setup.sh のダウンロードに失敗しました。" -ForegroundColor Red
-    exit 1
-}
-
-# --- プロジェクト名入力 ---
-$projectName = Read-Host "作成するLaravelプロジェクト名を入力してください（例: my-project）"
+# ===== プロジェクト名入力 =====
+$projectName = Read-Host "プロジェクト名を入力してください（例: my-project）"
 if ([string]::IsNullOrWhiteSpace($projectName)) {
     $projectName = "my-project"
 }
 
-# --- WSL 内でのセットアップ ---
-Write-Host ""
-Write-Host "⚙️ Ubuntu 上で Laravel 環境を構築中..." -ForegroundColor Yellow
+# ===== setup.sh ダウンロード =====
+$repoUser = "yuuki0508"
+$repoName = "laravel-inertia-template"
+$setupUrl = "https://raw.githubusercontent.com/$repoUser/$repoName/main/setup.sh"
+$setupPath = "$env:USERPROFILE\setup.sh"
 
-$escapedUser = $env:UserName.Replace("'", "''")
+Write-Host ""
+Write-Host "📥 setup.sh を GitHub から取得しています..." -ForegroundColor Yellow
+
+# 古いファイル削除
+if (Test-Path $setupPath) {
+    Remove-Item $setupPath -Force
+}
+
+Invoke-WebRequest -Uri $setupUrl -OutFile $setupPath -UseBasicParsing
+if (-not (Test-Path $setupPath)) {
+    Write-Host "❌ setup.sh のダウンロードに失敗しました。" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "✅ setup.sh をダウンロードしました: $setupPath" -ForegroundColor Green
+
+# ===== Ubuntu 内で実行 =====
+Write-Host ""
+Write-Host "⚙️ Ubuntu 上で Laravel セットアップを実行中..." -ForegroundColor Yellow
+
+$escapedUser = $env:UserName
 $escapedProjectName = $projectName.Replace("'", "''")
 
-$wslCommands = @"
+# Bash コマンド（PowerShell変数展開無効）
+$wslCommands = @'
 cd ~
-if [ -d "$escapedProjectName" ]; then
-    echo "⚠️ 既にプロジェクト '$escapedProjectName' が存在します。再構築はスキップします。"
+projectName="{projectName}"
+if [ -d "$projectName" ]; then
+    echo "⚠️ 既にプロジェクト '$projectName' が存在します。再構築はスキップします。"
     exit 0
 fi
 
-# setup.sh を配置して実行
-mv /mnt/c/Users/$escapedUser/setup.sh ~/setup.sh
+mv "/mnt/c/Users/{escapedUser}/setup.sh" ~/setup.sh
 chmod +x ~/setup.sh
-bash ~/setup.sh '$escapedProjectName'
-"@
+bash ~/setup.sh "$projectName"
+'@
 
+# PowerShell 変数を埋め込み
+$wslCommands = $wslCommands.Replace("{escapedUser}", $escapedUser)
+$wslCommands = $wslCommands.Replace("{projectName}", $escapedProjectName)
+
+# 実行
 wsl -d $ubuntuDistro -e bash -c "$wslCommands"
 
-# --- 完了メッセージ ---
 Write-Host ""
 Write-Host "=============================================" -ForegroundColor Green
-Write-Host "✅ すべてのセットアップが完了しました！" -ForegroundColor Green
+Write-Host "✅ すべて完了しました！" -ForegroundColor Green
 Write-Host "=============================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "📍 次の手順:"
-Write-Host "1️⃣  WSLを起動: wsl -d $ubuntuDistro"
-Write-Host "2️⃣  プロジェクトへ移動: cd ~/$projectName"
-Write-Host "3️⃣  開発サーバー起動: ./start.sh または npm run dev"
+Write-Host "次のステップ:" -ForegroundColor Cyan
+Write-Host "1. WSLを起動:  wsl -d $ubuntuDistro" -ForegroundColor White
+Write-Host "2. プロジェクトへ移動: cd ~/$projectName" -ForegroundColor White
+Write-Host "3. 開発サーバー起動:  npm run dev" -ForegroundColor White
 Write-Host ""
-Write-Host "💡 もう一度このスクリプトを実行しても、既存環境を壊さず安全に再実行できます。" -ForegroundColor Cyan
+Write-Host "または一発起動コマンド:" -ForegroundColor Cyan
+Write-Host "wsl -d $ubuntuDistro -e bash -c 'cd ~/$projectName && ./start.sh'" -ForegroundColor White
+Write-Host ""
