@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-
 PROJECT_NAME=${1:-laravel-app}
 APP_PORT=${2:-80}
 DB_PASSWORD="password"
@@ -20,7 +19,6 @@ if ! command -v docker &> /dev/null; then
 fi
 
 mkdir -p "$DEVELOP_DIR"
-
 if [ -d "$PROJECT_DIR" ]; then
     echo "⚠️  既に $PROJECT_DIR が存在します。削除して再実行するか、別名を指定してください。"
     exit 1
@@ -66,7 +64,6 @@ EOF
 # ---------- 環境設定 ----------
 echo "🔧 .env設定を調整中..."
 cp .env.example .env
-
 sed -i "s/DB_HOST=.*/DB_HOST=mysql/" .env
 sed -i "s/DB_DATABASE=.*/DB_DATABASE=${DB_NAME}/" .env
 sed -i "s/DB_USERNAME=.*/DB_USERNAME=sail/" .env
@@ -76,15 +73,34 @@ sed -i "s/APP_NAME=.*/APP_NAME=\"${PROJECT_NAME}\"/" .env
 
 # ---------- Breeze + Vue + Inertia ----------
 echo "✨ Laravel Breeze + Vue + Inertia を導入中..."
-./vendor/bin/sail composer require laravel/breeze --dev
-./vendor/bin/sail artisan breeze:install vue --inertia
 
-# ✅ コンテナを一度起動（依存解決に必要）
+# ✅ Sailコンテナ起動前にBreezeをインストール
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -v $(pwd):/app \
+  -w /app \
+  laravelsail/php84-composer:latest \
+  bash -c "composer require laravel/breeze --dev"
+
+# ✅ コンテナを起動
+echo "🐳 Sailコンテナを起動中..."
 ./vendor/bin/sail up -d
 
+# コンテナが完全に起動するまで待機
+echo "⏳ データベース起動を待機中..."
+sleep 10
+
+# ✅ Breeze インストール（Vue + Inertia）
+echo "🎨 Breezeをインストール中..."
+./vendor/bin/sail artisan breeze:install vue --no-interaction
+
 # ✅ Node 依存パッケージをインストール
+echo "📦 Node.jsパッケージをインストール中..."
 ./vendor/bin/sail npm install
 ./vendor/bin/sail npm install @inertiajs/progress ziggy-js --save
+
+# ✅ Ziggy導入
+echo "🗺️ Ziggyをインストール中..."
 ./vendor/bin/sail composer require tightenco/ziggy
 ./vendor/bin/sail artisan vendor:publish --tag=ziggy-config
 
@@ -95,9 +111,15 @@ echo "🧱 データベースを初期化中..."
 
 # ---------- 完了メッセージ ----------
 echo ""
+echo "============================================="
 echo "✅ セットアップ完了！"
+echo "============================================="
 echo ""
 echo "📁 プロジェクトディレクトリ: $PROJECT_DIR"
-echo "🌐 アプリ:        http://localhost:${APP_PORT}/sample"
+echo "🌐 アプリ:        http://localhost:${APP_PORT}"
 echo "🗄️ phpMyAdmin:   http://localhost:${PMA_PORT} (root / ${DB_PASSWORD})"
+echo ""
+echo "🚀 次のステップ:"
+echo "   cd $PROJECT_DIR"
+echo "   ./vendor/bin/sail npm run dev"
 echo ""
