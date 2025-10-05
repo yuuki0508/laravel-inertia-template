@@ -50,10 +50,11 @@ echo -e "${GREEN}✅ 必要ツール確認完了${NC}"
 # ===== Laravel プロジェクト作成 =====
 if [ ! -f "artisan" ]; then
     echo -e "${BLUE}[2/8] Laravel プロジェクト作成中...${NC}"
-    docker run --rm \
+    sudo -u $USER docker run --rm \
       -v $(pwd):/app \
       -w /app \
-      laravelsail/php84-composer:latest bash -c "composer create-project laravel/laravel ."
+      laravelsail/php84-composer:latest \
+      bash -c "composer create-project laravel/laravel $PROJECT_NAME"
 else
     echo -e "${YELLOW}⚠️ Laravel は既に作成済みです。${NC}"
 fi

@@ -21,6 +21,8 @@
 ```bash
 mkdir -p ~/develop
 
-## 実行方法
+# === Laravel + Sail + Inertia 環境を自動構築 ===
+# Ubuntu（WSL2）ターミナルで以下を実行
 
-bash <(curl -fsSL https://raw.githubusercontent.com/yuuki0508/laravel-inertia-template/main/setup.sh) my-project
+curl -LfsS https://raw.githubusercontent.com/yuuki0508/laravel-inertia-template/main/setup.sh | bash -s my-project
+
