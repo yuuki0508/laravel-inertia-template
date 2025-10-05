@@ -90,23 +90,15 @@ echo "🐳 Sailコンテナを起動中..."
 echo "⏳ データベース起動を待機中..."
 sleep 10
 
-# ✅ Viteバージョン互換性を事前に修正するためにpackage.jsonを取得
-echo "🔧 Vite依存関係の事前修正..."
-if [ -f "package.json" ]; then
-    # 既存のpackage.jsonがあればViteバージョンを修正
-    sed -i 's/"vite": "\^[0-9.]*"/"vite": "^6.0.0"/' package.json
-fi
-
 # ✅ Breeze インストール（Vue + Inertia）- npm installをスキップ
 echo "🎨 Breezeをインストール中..."
 ./vendor/bin/sail artisan breeze:install vue --composer=global --no-interaction || true
 
-# ✅ Breezeインストール後にpackage.jsonを再修正
-echo "🔧 Viteバージョンを再調整中..."
-sed -i 's/"vite": "\^7[0-9.]*"/"vite": "^6.0.0"/' package.json
-sed -i 's/"@vitejs\/plugin-vue": "\^[0-9.]*"/"@vitejs\/plugin-vue": "^5.2.0"/' package.json
+# ✅ Vite 7に対応した@vitejs/plugin-vueをインストール
+echo "🔧 Vite依存関係を修正中..."
+./vendor/bin/sail npm install @vitejs/plugin-vue@latest --save-dev --legacy-peer-deps
 
-# ✅ Node 依存パッケージをクリーンインストール
+# ✅ Node 依存パッケージをインストール（legacy-peer-deps使用）
 echo "📦 Node.jsパッケージをインストール中..."
 ./vendor/bin/sail npm install --legacy-peer-deps
 
@@ -138,9 +130,9 @@ echo "📁 プロジェクトディレクトリ: $PROJECT_DIR"
 echo "🌐 アプリ:        http://localhost:${APP_PORT}"
 echo "🗄️ phpMyAdmin:   http://localhost:${PMA_PORT} (root / ${DB_PASSWORD})"
 echo ""
-echo "🚀 次のステップ:"
+echo "🚀 開発サーバーを起動するには:"
 echo "   cd $PROJECT_DIR"
 echo "   ./vendor/bin/sail npm run dev"
 echo ""
-echo "💡 開発サーバー起動後、ブラウザで http://localhost:${APP_PORT} にアクセス"
+echo "💡 ブラウザで http://localhost:${APP_PORT} にアクセスしてください"
 echo ""
