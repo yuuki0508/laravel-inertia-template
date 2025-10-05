@@ -1,141 +1,100 @@
-# --- UTF-8文字化け対策 ---
-[Console]::InputEncoding = [System.Text.Encoding]::UTF8
+# =============================================
+# 🚀 Laravel Sail + Docker + WSL2 環境 完全自動構築スクリプト
+# =============================================
+
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-chcp.com 65001 > $null
-# -------------------------
-
-<#
-.SYNOPSIS
-  Laravel Sail + Vue + Inertia 環境 自動構築スクリプト
-.DESCRIPTION
-  Windows + Docker Desktop + WSL2 がセットアップされていれば、
-  このスクリプト1本でLaravel Sail環境を自動構築します。
-  Ubuntuが未導入の場合は自動で導入します。
-.PARAMETER ProjectName
-  Laravelプロジェクト名（デフォルト: laravel-app）
-.PARAMETER Port
-  Webアプリケーションのポート番号（デフォルト: 80）
-.EXAMPLE
-  iwr -useb https://raw.githubusercontent.com/yuuki0508/laravel-inertia-template/main/setup-laravel1.ps1 | iex
-#>
-
-$ProjectName = "laravel-app"
-$Port = 80
-
 $ErrorActionPreference = "Stop"
 
-function Write-Section($text) {
-    Write-Host ""
-    Write-Host "=============================================" -ForegroundColor Cyan
-    Write-Host " $text" -ForegroundColor Cyan
-    Write-Host "=============================================" -ForegroundColor Cyan
-    Write-Host ""
-}
+Write-Host "=============================================" -ForegroundColor Cyan
+Write-Host "🐳 Laravel Sail + Docker + WSL2 自動構築を開始します..." -ForegroundColor Cyan
+Write-Host "=============================================" -ForegroundColor Cyan
+Write-Host ""
 
-Write-Section "🚀 Laravel Sail + Docker + WSL2 自動構築スクリプト 開始"
-
-# ===== パラメータ入力 =====
-if (-not $ProjectName) {
-    $ProjectName = Read-Host "プロジェクト名を入力してください（例: my-project）"
-    if ([string]::IsNullOrWhiteSpace($ProjectName)) { $ProjectName = "laravel-app" }
-}
-
-if (-not $Port) {
-    $Port = Read-Host "アプリのポート番号を入力してください（デフォルト: 80）"
-    if ([string]::IsNullOrWhiteSpace($Port)) { $Port = 80 }
-}
-
-# ===== Docker チェック =====
-Write-Host "`n🔍 Docker Desktop を確認中..." -ForegroundColor Yellow
+# ===== Docker Desktop チェック =====
 if (-not (Get-Command "docker" -ErrorAction SilentlyContinue)) {
     Write-Host "❌ Docker Desktop が見つかりません。インストールしてください。" -ForegroundColor Red
     exit 1
-} else {
-    Write-Host "✅ Docker Desktop が見つかりました。" -ForegroundColor Green
 }
 
-# ===== WSL チェック =====
-Write-Host "`n🔍 WSL2 の状態を確認中..." -ForegroundColor Yellow
-$wslStatus = wsl --status 2>&1
+# ===== WSL 状態確認 =====
+$wslStatus = wsl --status 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ WSL2 が有効化されていません。有効化してください。" -ForegroundColor Red
+    Write-Host "❌ WSL2 が有効化されていません。有効化して再試行してください。" -ForegroundColor Red
     exit 1
-} else {
-    Write-Host "✅ WSL2 が有効です。" -ForegroundColor Green
 }
 
-# ===== Ubuntu チェック =====
-Write-Host "`n🔍 Ubuntu の存在を確認中..." -ForegroundColor Yellow
+# ===== Ubuntu rootfs インポート方式 =====
 $ubuntuName = "Ubuntu"
-$existingUbuntu = wsl -l -q | Where-Object { $_ -match $ubuntuName }
+$ubuntuDir = "C:\WSL\$ubuntuName"
+$ubuntuTar = "$env:USERPROFILE\Downloads\ubuntu-jammy-rootfs.tar.gz"
+$ubuntuUrl = "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-wsl.rootfs.tar.gz"
 
-if (-not $existingUbuntu) {
-    Write-Host "⬇️ Ubuntuをインストール中..." -ForegroundColor Yellow
-    wsl --install -d Ubuntu
-    Write-Host "✅ Ubuntu のインストールが完了しました。再起動が必要な場合は再起動してください。" -ForegroundColor Green
-    exit 0
-} else {
-    $distroName = ($existingUbuntu | Select-Object -First 1).Trim()
-    Write-Host "🟢 Ubuntu がすでにインストールされています: $distroName" -ForegroundColor Green
-}
+$existing = wsl --list --quiet | Select-String $ubuntuName
+if (-not $existing) {
+    Write-Host "🐧 Ubuntuが未インストールのため、自動導入を開始します..." -ForegroundColor Yellow
 
-# ===== テンプレートの取得 =====
-Write-Host "`n📦 Laravel テンプレートを確認中..." -ForegroundColor Yellow
-$repoUrl = "https://github.com/yuuki0508/laravel-inertia-template.git"
-$projectRoot = "$HOME\laravel-docker-template"
-
-if (-not (Test-Path $projectRoot)) {
-    Write-Host "テンプレートを取得中..." -ForegroundColor Yellow
-    git clone $repoUrl $projectRoot
-} else {
-    Write-Host "既存のテンプレートを使用します（更新中...）" -ForegroundColor Yellow
-    try {
-        Set-Location $projectRoot
-        git pull origin main
-    } catch {
-        Write-Host "⚠️ git pull に失敗しましたが既存フォルダを使用します。" -ForegroundColor DarkYellow
+    if (-not (Test-Path $ubuntuDir)) {
+        Write-Host "📂 ディレクトリ作成中: $ubuntuDir" -ForegroundColor DarkGray
+        New-Item -ItemType Directory -Path $ubuntuDir | Out-Null
     }
+
+    if (-not (Test-Path $ubuntuTar)) {
+        Write-Host "⬇️ Ubuntu rootfsをダウンロード中..." -ForegroundColor Cyan
+        Invoke-WebRequest -Uri $ubuntuUrl -OutFile $ubuntuTar
+    } else {
+        Write-Host "🟢 既存のrootfsを再利用します。" -ForegroundColor Green
+    }
+
+    Write-Host "📦 Ubuntu rootfsをインポート中..." -ForegroundColor Cyan
+    wsl --import $ubuntuName $ubuntuDir $ubuntuTar --version 2
+
+    Write-Host "✅ Ubuntu の登録が完了しました！" -ForegroundColor Green
+} else {
+    Write-Host "🟢 既に Ubuntu が登録されています。" -ForegroundColor Green
 }
 
-# ===== Ubuntu 上でセットアップ実行 =====
-Write-Host "`n⚙️ Ubuntu 上で Laravel 環境を構築中..." -ForegroundColor Cyan
+wsl --set-default $ubuntuName | Out-Null
+Write-Host "⚙️ Ubuntu を既定ディストリビューションに設定しました。" -ForegroundColor Gray
 
-$escapedPath = "/mnt/c/Users/$env:UserName/laravel-docker-template"
-$cmd = @"
-cd $escapedPath
-if [ -f setup.sh ]; then
-  bash setup.sh '$ProjectName' '$Port'
-else
-  echo '❌ setup.sh が見つかりません。GitHub テンプレートを確認してください。'
-  exit 1
-fi
+# ===== プロジェクト情報入力 =====
+Write-Host ""
+$projectName = Read-Host "🔧 プロジェクト名を入力してください（例: my-app）"
+if ([string]::IsNullOrWhiteSpace($projectName)) { $projectName = "laravel-app" }
+
+$port = Read-Host "🌐 使用するポート番号を入力してください（例: 80）"
+if ([string]::IsNullOrWhiteSpace($port)) { $port = 80 }
+
+Write-Host ""
+Write-Host "✅ プロジェクト設定: $projectName / Port $port" -ForegroundColor Green
+Write-Host ""
+
+# ===== setup.sh を Ubuntu 上で実行 =====
+$setupUrl = "https://raw.githubusercontent.com/yuuki0508/laravel-inertia-template/main/setup.sh"
+
+$wslCommands = @"
+cd ~
+echo '⬇️ セットアップスクリプトをダウンロード中...'
+curl -fsSL $setupUrl -o setup.sh
+chmod +x setup.sh
+bash setup.sh '$projectName' '$port'
 "@
 
-try {
-    wsl -d $distroName bash -c "$cmd"
-} catch {
-    Write-Host "❌ Ubuntu 内でのセットアップ中にエラーが発生しました。" -ForegroundColor Red
-    Write-Host $_.Exception.Message -ForegroundColor Red
-    exit 1
-}
+Write-Host "⚙️ Ubuntu上でセットアップを実行中..." -ForegroundColor Yellow
+wsl -d $ubuntuName -e bash -c $wslCommands
 
-# ===== 起動確認と案内 =====
-$appPort = $Port
-$pmaPort = 8080
-
+# ===== 完了メッセージ =====
 Write-Host ""
-Write-Host "🌐 ブラウザを自動で開きます..." -ForegroundColor Green
-Start-Process "http://localhost:$appPort/sample"
-Start-Process "http://localhost:$pmaPort"
-
+Write-Host "=============================================" -ForegroundColor Green
+Write-Host "✅ すべて完了しました！" -ForegroundColor Green
+Write-Host "=============================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "✅ Laravel 環境構築が完了しました！" -ForegroundColor Cyan
-Write-Host "--------------------------------------------"
-Write-Host " プロジェクト名 : $ProjectName"
-Write-Host " アプリURL       : http://localhost:$appPort/sample"
-Write-Host " phpMyAdmin       : http://localhost:$pmaPort (root / password)"
-Write-Host "--------------------------------------------"
+Write-Host "次のステップ:" -ForegroundColor Cyan
+Write-Host "1️⃣  WSLを起動: wsl -d $ubuntuName" -ForegroundColor White
+Write-Host "2️⃣  プロジェクトへ移動: cd ~/$projectName" -ForegroundColor White
+Write-Host "3️⃣  サーバー起動: npm run dev" -ForegroundColor White
 Write-Host ""
-Write-Host "次のコマンドで Laravel コンテナに接続できます:" -ForegroundColor Yellow
-Write-Host "  wsl -d $distroName -e bash -c 'cd $escapedPath && ./vendor/bin/sail shell'"
+Write-Host "または一発起動:" -ForegroundColor Cyan
+Write-Host "wsl -d $ubuntuName -e bash -c 'cd ~/$projectName && ./start.sh'" -ForegroundColor White
 Write-Host ""
+Write-Host "🌐 LaravelアプリURL: http://localhost:$port" -ForegroundColor Green
+Write-Host "---------------------------------------------" -ForegroundColor Gray
