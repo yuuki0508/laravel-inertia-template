@@ -92,7 +92,18 @@ sleep 10
 
 # ✅ Breeze インストール（PHPファイルのみ、npm installはスキップ）
 echo "🎨 Breezeをインストール中（PHP部分のみ）..."
-./vendor/bin/sail artisan breeze:install vue --composer=global --no-interaction 2>&1 | grep -v "npm error" || true
+set +e  # 一時的にエラーで停止しないようにする
+./vendor/bin/sail artisan breeze:install vue --composer=global --no-interaction
+BREEZE_EXIT_CODE=$?
+set -e  # エラーで停止する設定を戻す
+
+if [ $BREEZE_EXIT_CODE -ne 0 ]; then
+    echo "⚠️ Breezeインストールでエラーが発生しましたが、続行します..."
+fi
+
+echo ""
+echo "⏳ Breezeインストール完了を確認中..."
+sleep 3
 
 # ✅ package.jsonとnode_modulesを一旦削除して、依存関係を手動で再構築
 echo "🧹 Node関連ファイルをクリーンアップ中..."
@@ -128,9 +139,20 @@ cat > package.json <<'PACKAGE_JSON'
 }
 PACKAGE_JSON
 
+echo "✅ package.json作成完了"
+cat package.json
+
 # ✅ Node 依存パッケージをクリーンインストール
+echo ""
 echo "📦 Node.jsパッケージをインストール中..."
 ./vendor/bin/sail npm install
+
+if [ ! -d "node_modules" ]; then
+    echo "❌ node_modulesの作成に失敗しました"
+    exit 1
+fi
+
+echo "✅ Node.jsパッケージインストール完了"
 
 # ✅ Ziggy導入
 echo "🗺️ Ziggyをインストール中..."
