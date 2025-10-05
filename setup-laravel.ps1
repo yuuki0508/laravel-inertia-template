@@ -27,7 +27,8 @@ if ($LASTEXITCODE -ne 0) {
 $ubuntuName = "Ubuntu"
 $ubuntuDir = "C:\WSL\$ubuntuName"
 $ubuntuTar = "$env:USERPROFILE\Downloads\ubuntu-jammy-rootfs.tar.gz"
-$ubuntuUrl = "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-wsl.rootfs.tar.gz"
+$ubuntuUrl = "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-rootfs.tar.gz"
+
 
 $existing = wsl --list --quiet | Select-String $ubuntuName
 if (-not $existing) {
