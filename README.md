@@ -26,3 +26,17 @@ mkdir -p ~/develop
 
 curl -LfsS https://raw.githubusercontent.com/yuuki0508/laravel-inertia-template/main/setup.sh | bash -s my-project
 
+
+
+## 削除手順
+
+まずは必ずコンテナを停止させる。
+
+cd ~/develop/my-project
+./vendor/bin/sail down
+
+次にディレクトリごと削除する
+
+cd ~/develop
+sudo rm -rf my-project
+

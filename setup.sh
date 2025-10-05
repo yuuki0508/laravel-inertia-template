@@ -70,7 +70,7 @@ echo "🐳 Dockerコンテナを起動します (初回は数分かかります)
 # --- Node.js & npmセットアップ ---
 echo "🧩 Node.js + Vue + Inertiaを導入中..."
 ./vendor/bin/sail npm install vue @vitejs/plugin-vue laravel-vite-plugin inertia inertia-vue3
-./vendor/bin/sail npm install
+./vendor/bin/sail npm install --legacy-peer-deps
 
 # --- 開発ビルド実行 ---
 ./vendor/bin/sail npm run build
