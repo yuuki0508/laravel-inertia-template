@@ -1,7 +1,7 @@
 # --- UTF-8文字化け対策 ---
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'
-# --------------------------
+# -------------------------
 
 <#
 .SYNOPSIS
