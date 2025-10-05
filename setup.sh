@@ -23,11 +23,6 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! command -v wsl >/dev/null 2>&1; then
-  echo "❌ WSL2環境が検出されません。Windowsの機能でWSL2を有効化してください。"
-  exit 1
-fi
-
 # --- ディレクトリ設定 ---
 WORK_DIR="$HOME/develop/$PROJECT_NAME"
 
