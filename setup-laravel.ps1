@@ -1,4 +1,5 @@
 # --- UTF-8文字化け対策 ---
+chcp 65001 > $null
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'
 # -------------------------
