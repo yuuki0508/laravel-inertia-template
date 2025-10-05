@@ -54,7 +54,7 @@ if [ ! -f "artisan" ]; then
       -v $(pwd):/app \
       -w /app \
       laravelsail/php84-composer:latest \
-      bash -c "composer create-project laravel/laravel $PROJECT_NAME"
+      bash -c "composer create-project laravel/laravel ."
 else
     echo -e "${YELLOW}⚠️ Laravel は既に作成済みです。${NC}"
 fi
