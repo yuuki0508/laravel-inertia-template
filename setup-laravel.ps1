@@ -18,10 +18,8 @@ $PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'
   iwr -useb https://raw.githubusercontent.com/yuuki0508/laravel-inertia-template/main/setup-laravel1.ps1 | iex
 #>
 
-param(
-    [string]$ProjectName,
-    [int]$Port
-)
+$ProjectName = "laravel-app"
+$Port = 80
 
 $ErrorActionPreference = "Stop"
 
