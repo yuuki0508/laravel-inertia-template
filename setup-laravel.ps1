@@ -60,4 +60,71 @@ if (-not $existing) {
     wsl --import $ubuntuDistro $ubuntuRoot $ubuntuTar --version 2
 
     Remove-Item $ubuntuTar -Force
-    Write-Host "✅ Ubuntu のインポートが完了しました。" -Foregrou
+    Write-Host "✅ Ubuntu のインポートが完了しました。" -ForegroundColor Green
+} else {
+    Write-Host "🟢 Ubuntu は既にインストールされています。スキップします。" -ForegroundColor Green
+}
+
+# --- setup.sh のダウンロード（安全・再実行対応） ---
+Write-Host ""
+Write-Host "📥 setup.sh をダウンロード中..." -ForegroundColor Cyan
+
+# 古いファイル削除
+Get-ChildItem -Path $env:USERPROFILE -Filter "setup.sh*" | Remove-Item -Force -ErrorAction SilentlyContinue
+
+# 新規ダウンロード
+Invoke-WebRequest -Uri $setupUrl -OutFile $setupFile -UseBasicParsing
+
+# 不可視文字を除去
+$newName = "$env:USERPROFILE\setup.sh"
+Get-ChildItem $env:USERPROFILE | Where-Object { $_.Name -match "setup.sh" -and $_.Name -ne "setup.sh" } | ForEach-Object {
+    Rename-Item $_.FullName $newName -Force
+}
+
+if (Test-Path $setupFile) {
+    Write-Host "✅ setup.sh ダウンロード完了: $setupFile" -ForegroundColor Green
+} else {
+    Write-Host "❌ setup.sh のダウンロードに失敗しました。" -ForegroundColor Red
+    exit 1
+}
+
+# --- プロジェクト名入力 ---
+$projectName = Read-Host "作成するLaravelプロジェクト名を入力してください（例: my-project）"
+if ([string]::IsNullOrWhiteSpace($projectName)) {
+    $projectName = "my-project"
+}
+
+# --- WSL 内でのセットアップ ---
+Write-Host ""
+Write-Host "⚙️ Ubuntu 上で Laravel 環境を構築中..." -ForegroundColor Yellow
+
+$escapedUser = $env:UserName.Replace("'", "''")
+$escapedProjectName = $projectName.Replace("'", "''")
+
+$wslCommands = @"
+cd ~
+if [ -d "$escapedProjectName" ]; then
+    echo "⚠️ 既にプロジェクト '$escapedProjectName' が存在します。再構築はスキップします。"
+    exit 0
+fi
+
+# setup.sh を配置して実行
+mv /mnt/c/Users/$escapedUser/setup.sh ~/setup.sh
+chmod +x ~/setup.sh
+bash ~/setup.sh '$escapedProjectName'
+"@
+
+wsl -d $ubuntuDistro -e bash -c "$wslCommands"
+
+# --- 完了メッセージ ---
+Write-Host ""
+Write-Host "=============================================" -ForegroundColor Green
+Write-Host "✅ すべてのセットアップが完了しました！" -ForegroundColor Green
+Write-Host "=============================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "📍 次の手順:"
+Write-Host "1️⃣  WSLを起動: wsl -d $ubuntuDistro"
+Write-Host "2️⃣  プロジェクトへ移動: cd ~/$projectName"
+Write-Host "3️⃣  開発サーバー起動: ./start.sh または npm run dev"
+Write-Host ""
+Write-Host "💡 もう一度このスクリプトを実行しても、既存環境を壊さず安全に再実行できます。" -ForegroundColor Cyan
