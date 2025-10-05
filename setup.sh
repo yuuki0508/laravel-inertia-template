@@ -90,20 +90,21 @@ echo "🐳 Sailコンテナを起動中..."
 echo "⏳ データベース起動を待機中..."
 sleep 10
 
-# ✅ Breeze インストール（Vue + Inertia）
-echo "🎨 Breezeをインストール中..."
-./vendor/bin/sail artisan breeze:install vue --no-interaction
+# ✅ Viteバージョン互換性を事前に修正するためにpackage.jsonを取得
+echo "🔧 Vite依存関係の事前修正..."
+if [ -f "package.json" ]; then
+    # 既存のpackage.jsonがあればViteバージョンを修正
+    sed -i 's/"vite": "\^[0-9.]*"/"vite": "^6.0.0"/' package.json
+fi
 
-# ✅ package.jsonのViteバージョンを修正
-echo "🔧 Vite依存関係を修正中..."
-./vendor/bin/sail exec laravel.test bash -c "cat > /tmp/fix_package.json << 'EOFSCRIPT'
-const fs = require('fs');
-const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-packageJson.devDependencies['vite'] = '^6.0.0';
-packageJson.devDependencies['@vitejs/plugin-vue'] = '^5.2.0';
-fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 4));
-EOFSCRIPT
-node /tmp/fix_package.json"
+# ✅ Breeze インストール（Vue + Inertia）- npm installをスキップ
+echo "🎨 Breezeをインストール中..."
+./vendor/bin/sail artisan breeze:install vue --composer=global --no-interaction || true
+
+# ✅ Breezeインストール後にpackage.jsonを再修正
+echo "🔧 Viteバージョンを再調整中..."
+sed -i 's/"vite": "\^7[0-9.]*"/"vite": "^6.0.0"/' package.json
+sed -i 's/"@vitejs\/plugin-vue": "\^[0-9.]*"/"@vitejs\/plugin-vue": "^5.2.0"/' package.json
 
 # ✅ Node 依存パッケージをクリーンインストール
 echo "📦 Node.jsパッケージをインストール中..."
@@ -140,4 +141,6 @@ echo ""
 echo "🚀 次のステップ:"
 echo "   cd $PROJECT_DIR"
 echo "   ./vendor/bin/sail npm run dev"
+echo ""
+echo "💡 開発サーバー起動後、ブラウザで http://localhost:${APP_PORT} にアクセス"
 echo ""
