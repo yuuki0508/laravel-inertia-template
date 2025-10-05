@@ -1,4 +1,9 @@
-﻿<#
+# --- UTF-8文字化け対策 ---
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'
+# --------------------------
+
+<#
 .SYNOPSIS
   Laravel Sail + Vue + Inertia 環境 自動構築スクリプト
 .DESCRIPTION
