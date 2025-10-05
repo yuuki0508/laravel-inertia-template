@@ -90,21 +90,47 @@ echo "🐳 Sailコンテナを起動中..."
 echo "⏳ データベース起動を待機中..."
 sleep 10
 
-# ✅ Breeze インストール（Vue + Inertia）- npm installをスキップ
-echo "🎨 Breezeをインストール中..."
-./vendor/bin/sail artisan breeze:install vue --composer=global --no-interaction || true
+# ✅ Breeze インストール（PHPファイルのみ、npm installはスキップ）
+echo "🎨 Breezeをインストール中（PHP部分のみ）..."
+./vendor/bin/sail artisan breeze:install vue --composer=global --no-interaction 2>&1 | grep -v "npm error" || true
 
-# ✅ Vite 7に対応した@vitejs/plugin-vueをインストール
-echo "🔧 Vite依存関係を修正中..."
-./vendor/bin/sail npm install @vitejs/plugin-vue@latest --save-dev --legacy-peer-deps
+# ✅ package.jsonとnode_modulesを一旦削除して、依存関係を手動で再構築
+echo "🧹 Node関連ファイルをクリーンアップ中..."
+rm -f package-lock.json
+rm -rf node_modules
 
-# ✅ Node 依存パッケージをインストール（legacy-peer-deps使用）
+# ✅ package.jsonを直接書き換えて互換性のあるバージョンを指定
+echo "📝 package.jsonを最適化中..."
+cat > package.json <<'PACKAGE_JSON'
+{
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build"
+    },
+    "devDependencies": {
+        "@inertiajs/vue3": "^2.0.0",
+        "@tailwindcss/forms": "^0.5.3",
+        "@vitejs/plugin-vue": "^5.2.0",
+        "autoprefixer": "^10.4.12",
+        "axios": "^1.7.4",
+        "laravel-vite-plugin": "^1.0.0",
+        "postcss": "^8.4.31",
+        "tailwindcss": "^3.2.1",
+        "vite": "^5.0.0",
+        "vue": "^3.4.0"
+    },
+    "dependencies": {
+        "@inertiajs/progress": "^0.2.7",
+        "ziggy-js": "^2.4.0"
+    }
+}
+PACKAGE_JSON
+
+# ✅ Node 依存パッケージをクリーンインストール
 echo "📦 Node.jsパッケージをインストール中..."
-./vendor/bin/sail npm install --legacy-peer-deps
-
-# ✅ 追加パッケージをインストール
-echo "📦 追加パッケージをインストール中..."
-./vendor/bin/sail npm install @inertiajs/progress ziggy-js --save --legacy-peer-deps
+./vendor/bin/sail npm install
 
 # ✅ Ziggy導入
 echo "🗺️ Ziggyをインストール中..."
