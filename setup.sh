@@ -1,10 +1,6 @@
 #!/bin/bash
 set -e
 
-# ================================
-# Laravel Sail + Inertia + Vue 自動構築スクリプト（Docker専用）
-# ================================
-
 PROJECT_NAME=${1:-laravel-app}
 APP_PORT=${2:-80}
 DB_PASSWORD="password"
@@ -36,24 +32,20 @@ cd "$PROJECT_DIR"
 # ---------- Laravel新規作成 ----------
 echo "📦 Laravel新規プロジェクトを作成中..."
 docker run --rm \
+  --user "$(id -u):$(id -g)" \
   -v $(pwd):/app \
   -w /app \
   laravelsail/php84-composer:latest \
   bash -c "composer create-project laravel/laravel ."
 
-# ✅ ここで権限を修正！
-sudo chown -R $USER:$USER "$PROJECT_DIR"
-
 # ---------- Laravel Sail導入 ----------
 echo "⚙️ Laravel Sailをインストール中..."
 docker run --rm \
+  --user "$(id -u):$(id -g)" \
   -v $(pwd):/app \
   -w /app \
   laravelsail/php84-composer:latest \
   bash -c "composer require laravel/sail --dev && php artisan sail:install --with=mysql,redis,mailpit"
-
-# 再度所有権修正（Dockerで生成されたものも対象）
-sudo chown -R $USER:$USER "$PROJECT_DIR"
 
 # ---------- phpMyAdmin ----------
 cat > docker-compose.override.yml <<EOF
@@ -73,8 +65,7 @@ EOF
 
 # ---------- 環境設定 ----------
 echo "🔧 .env設定を調整中..."
-cp .env.example .env || sudo cp .env.example .env
-sudo chown $USER:$USER .env
+cp .env.example .env
 
 sed -i "s/DB_HOST=.*/DB_HOST=mysql/" .env
 sed -i "s/DB_DATABASE=.*/DB_DATABASE=${DB_NAME}/" .env
